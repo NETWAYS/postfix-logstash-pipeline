@@ -7,11 +7,16 @@ on:
     branches:
       - master
   pull_request:
-  merge_group:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        logstashversion:
+          - 7
+          - 8
 
     steps:
       - name: Check out code
@@ -22,7 +27,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install gpg
           wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
-          echo "deb https://artifacts.elastic.co/packages/7.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-7.x.list
+          echo "deb https://artifacts.elastic.co/packages/${{ matrix.logstashversion }}.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-${{ matrix.logstashversion }}.x.list
           sudo apt-get update
           sudo apt-get install logstash
           mkdir -p /tmp/logstash/data /tmp/logstash/logs
