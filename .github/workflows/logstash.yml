@@ -1,22 +1,36 @@
 ---
 name: Logstash Syntax
+
 on:
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: 'Log level'
+        required: true
+        default: 'warning'
+        type: choice
+        options:
+          - info
+          - warning
+          - debug
   push:
     tags:
       - v*
     branches:
-      - master
+      - main
   pull_request:
+  merge_group:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        logstashversion:
-          - 7
-          - 8
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Check out code
@@ -24,14 +38,19 @@ jobs:
 
       - name: Install dependencies
         run: |
+          wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch \
+            | sudo gpg --dearmor -o /usr/share/keyrings/elastic-keyring.gpg
+          echo "deb [signed-by=/usr/share/keyrings/elastic-keyring.gpg] https://artifacts.elastic.co/packages/8.x/apt stable main" \
+            | sudo tee /etc/apt/sources.list.d/elastic-8.x.list
           sudo apt-get update
-          sudo apt-get install gpg
-          wget -qO - https://artifacts.elastic.co/GPG-KEY-elasticsearch | sudo apt-key add -
-          echo "deb https://artifacts.elastic.co/packages/${{ matrix.logstashversion }}.x/apt stable main" | sudo tee /etc/apt/sources.list.d/elastic-${{ matrix.logstashversion }}.x.list
-          sudo apt-get update
-          sudo apt-get install logstash
+          sudo apt-get install -y logstash
           mkdir -p /tmp/logstash/data /tmp/logstash/logs
 
       - name: Test with Logstash
         run: |
-          /usr/share/logstash/bin/logstash  --path.settings /etc/logstash/ --path.config '*conf' --path.data /tmp/logstash/data --path.logs /tmp/logstash/logs --config.test_and_exit
+          /usr/share/logstash/bin/logstash \
+            --path.settings /etc/logstash/ \
+            --path.config '${{ github.workspace }}/*.conf' \
+            --path.data /tmp/logstash/data \
+            --path.logs /tmp/logstash/logs \
+            --config.test_and_exit
